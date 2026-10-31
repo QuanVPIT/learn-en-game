@@ -234,3 +234,9 @@ export function options(topic, word, n = 4) {
   const others = shuffle(topic.words.filter((w) => w.en !== word.en && w.pic !== word.pic)).slice(0, n - 1);
   return shuffle([word, ...others]);
 }
+
+// Các bé chơi game
+export const PLAYERS = [
+  { id: 'nic', name: 'Nic Sún Răng', short: 'Nic', face: '😁', color: '#7bdff2', shadow: '#3fb3cc' },
+  { id: 'ny', name: 'Ny Đen Đen', short: 'Ny', face: '😎', color: '#ff8fab', shadow: '#d65b80' },
+];

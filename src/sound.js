@@ -1,4 +1,4 @@
-// Giọng đọc (tiếng Anh + tiếng Việt), hiệu ứng âm thanh và lời khen cho Nic Sún Răng
+// Giọng đọc (tiếng Anh + tiếng Việt), hiệu ứng âm thanh và lời khen theo tên bé đang chơi
 let ctx = null;
 let enabled = true;
 let voices = { en: null, vi: null };
@@ -128,61 +128,98 @@ const FUN_SOUNDS = [
   },
 ];
 
-// Lời khen hài hước (tiếng Việt)
-const PRAISES_VI = [
-  'Nic Sún Răng giỏi quá, cười một cái lộ cả răng sún luôn!',
-  'Răng sún mà nói tiếng Anh chuẩn như người Mỹ! Nic Sún Răng ơi!',
-  'Ối giời ơi! Nic Sún Răng thông minh hơn cả cô giáo luôn!',
-  'Thưởng Nic Sún Răng một cái kẹo! À quên, sún răng rồi, thưởng cái ôm nhé!',
-  'Nic Sún Răng siêu như siêu nhân, chỉ thiếu mỗi cái răng cửa thôi!',
-  'Vèo vèo! Nic Sún Răng làm nhanh như tên lửa!',
-  'Bố ơi mẹ ơi, Nic Sún Răng sắp thành thầy giáo tiếng Anh rồi!',
-  'Chuẩn không cần chỉnh! Nic Sún Răng number one!',
-  'Giỏi thế này thì bà tiên răng phải mang quà cho Nic Sún Răng rồi!',
-  'Ha ha! Nic Sún Răng đúng rồi! Cả nhà vỗ tay bép bép!',
-  'Đỉnh của chóp! Nic Sún Răng ơi, răng mới mọc ra cũng phải khen con!',
-  'Úi chà chà! Nic Sún Răng học giỏi quá, gió lùa qua răng sún cũng không cản được!',
-  'Chú chuột nhắt đang nhảy múa ăn mừng cho Nic Sún Răng đấy!',
+// Bé đang chơi: { id, name, short }. App gọi setPlayer khi bé chọn tên.
+let player = { id: 'nic', name: 'Nic Sún Răng', short: 'Nic' };
+export const setPlayer = (p) => {
+  player = p;
+};
+
+// {n} = tên đầy đủ, {s} = tên ngắn
+const fill = (t) => t.replaceAll('{n}', player.name).replaceAll('{s}', player.short);
+
+// Lời khen hài hước dùng chung cho mọi bé
+const PRAISES_COMMON = [
+  'Ối giời ơi! {n} thông minh hơn cả cô giáo luôn!',
+  'Vèo vèo! {n} làm nhanh như tên lửa!',
+  'Bố ơi mẹ ơi, {n} sắp thành giáo viên tiếng Anh rồi!',
+  'Chuẩn không cần chỉnh! {n} number one!',
+  'Ha ha! {n} đúng rồi! Cả nhà vỗ tay bép bép!',
+  'Đỉnh của chóp! {n} giỏi quá trời quá đất!',
+  'Chú chuột nhắt đang nhảy múa ăn mừng cho {n} đấy!',
+  'Úi chà chà! {n} giỏi thế này thì con mèo nhà bên cũng phải học theo!',
+  'Tèn ten! {n} lại đúng nữa rồi, máy tính sắp hết lời khen luôn!',
 ];
 
-// Lời khen tiếng Anh ngắn, có tên Nic
+// Lời khen riêng theo biệt danh của từng bé
+const PRAISES_OWN = {
+  nic: [
+    'Nic Sún Răng giỏi quá, cười một cái lộ cả răng sún luôn!',
+    'Răng sún mà nói tiếng Anh chuẩn như người Mỹ! Nic Sún Răng ơi!',
+    'Thưởng Nic Sún Răng một cái kẹo! À quên, sún răng rồi, thưởng cái ôm nhé!',
+    'Nic Sún Răng siêu như siêu nhân, chỉ thiếu mỗi cái răng cửa thôi!',
+    'Giỏi thế này thì bà tiên răng phải mang quà cho Nic Sún Răng rồi!',
+    'Úi chà! Gió lùa qua răng sún cũng không cản được Nic Sún Răng!',
+    'Răng mới mọc ra cũng phải ngoi lên khen Nic Sún Răng đấy!',
+  ],
+  ny: [
+    'Ny Đen Đen giỏi quá! Đen đen mà sáng chói như ngôi sao luôn!',
+    'Ai bảo đen đủi? Ny Đen Đen may mắn và giỏi nhất nhà!',
+    'Sô cô la đen cũng không ngọt bằng Ny Đen Đen!',
+    'Cả nhà phải đeo kính râm vì Ny Đen Đen tỏa sáng quá!',
+    'Ny Đen Đen đúng rồi! Đen nhưng mà giỏi, giỏi ơi là giỏi!',
+    'Hạt nhãn đen láy cũng phải ghen tị với Ny Đen Đen thông minh!',
+    'Ny Đen Đen ơi, giỏi thế này thì mặt trời cũng phải xin chữ ký!',
+  ],
+};
+
+// Lời khen tiếng Anh ngắn, có tên ngắn của bé
 const PRAISES_EN = [
-  'Great job, Nic!',
-  'Super star, Nic!',
-  'Wow! Awesome, Nic!',
-  'Excellent, Nic!',
-  'Well done, Nic!',
-  'You are amazing, Nic!',
-  'Fantastic, Nic!',
-  'Nice work, Nic!',
+  'Great job, {s}!',
+  'Super star, {s}!',
+  'Wow! Awesome, {s}!',
+  'Excellent, {s}!',
+  'Well done, {s}!',
+  'You are amazing, {s}!',
+  'Fantastic, {s}!',
+  'Nice work, {s}!',
 ];
 
-const OOPS_VI = [
-  'Úi, trượt mất rồi! Nic Sún Răng thử lại nha!',
-  'Ối, gió lùa qua răng sún nên nghe nhầm hả? Thử lại nào!',
-  'Gần đúng rồi! Nic Sún Răng cố lên chút nữa!',
-  'Hì hì, chưa đúng. Nic Sún Răng nhìn kỹ lại nha!',
-  'Oops! Không sao, Nic Sún Răng làm lại phát nữa nào!',
+const OOPS_COMMON = [
+  'Úi, trượt mất rồi! {n} thử lại nha!',
+  'Gần đúng rồi! {n} cố lên chút nữa!',
+  'Hì hì, chưa đúng. {n} nhìn kỹ lại nha!',
+  'Oops! Không sao, {n} làm lại phát nữa nào!',
 ];
+
+const OOPS_OWN = {
+  nic: ['Ối, gió lùa qua răng sún nên nghe nhầm hả? Nic Sún Răng thử lại nào!'],
+  ny: ['Ối, chắc tại trời tối quá nên Ny Đen Đen nhìn nhầm hả? Thử lại nào!'],
+};
 
 const DONE_VI = {
-  3: [
-    'Ba ngôi sao! Nic Sún Răng là vua tiếng Anh! Răng sún cũng phải cúi chào!',
-    'Tuyệt cú mèo! Ba sao luôn! Nic Sún Răng giỏi nhất quả đất!',
-  ],
-  2: ['Hai ngôi sao! Nic Sún Răng giỏi lắm, chơi lại để lấy ba sao nào!', 'Hay lắm Nic Sún Răng! Thêm chút nữa là ba sao rồi!'],
-  1: ['Một ngôi sao! Nic Sún Răng đã cố gắng rồi, mình luyện thêm nha!', 'Được một sao rồi! Chơi lại nào Nic Sún Răng ơi!'],
+  3: ['Ba ngôi sao! {n} là vua tiếng Anh luôn!', 'Tuyệt cú mèo! Ba sao luôn! {n} giỏi nhất quả đất!'],
+  2: ['Hai ngôi sao! {n} giỏi lắm, chơi lại để lấy ba sao nào!', 'Hay lắm {n}! Thêm chút nữa là ba sao rồi!'],
+  1: ['Một ngôi sao! {n} đã cố gắng rồi, mình luyện thêm nha!', 'Được một sao rồi! Chơi lại nào {n} ơi!'],
+};
+
+const DONE_OWN = {
+  nic: 'Răng sún cũng phải cúi chào Nic Sún Răng!',
+  ny: 'Ny Đen Đen sáng chói nhất hôm nay!',
 };
 
 // Khen khi đúng: phát hiệu ứng + trả về câu khen {text, lang}
 export function cheer() {
   pick(FUN_SOUNDS)();
-  return Math.random() < 0.3 ? { text: pick(PRAISES_EN), lang: 'en' } : { text: pick(PRAISES_VI), lang: 'vi' };
+  const r = Math.random();
+  if (r < 0.25) return { text: fill(pick(PRAISES_EN)), lang: 'en' };
+  const own = PRAISES_OWN[player.id] || [];
+  const list = r < 0.65 && own.length ? own : PRAISES_COMMON;
+  return { text: fill(pick(list)), lang: 'vi' };
 }
 
 export function oops() {
   tone(300, 0, 0.18, { type: 'triangle', to: 160, vol: 0.2 });
-  return pick(OOPS_VI);
+  return fill(pick([...OOPS_COMMON, ...(OOPS_OWN[player.id] || [])]));
 }
 
 // Tiếng "bụp" nhẹ khi chạm sai trong lúc ghép chữ (không đọc)
@@ -197,7 +234,8 @@ export function pop() {
 export function finish(stars) {
   applause(2);
   [523, 659, 784, 1047, 784, 1047].forEach((f, i) => tone(f, i * 0.12, 0.25, { type: 'triangle', vol: 0.25 }));
-  return pick(DONE_VI[stars] || DONE_VI[1]);
+  const text = fill(pick(DONE_VI[stars] || DONE_VI[1]));
+  return stars === 3 && DONE_OWN[player.id] ? `${text} ${DONE_OWN[player.id]}` : text;
 }
 
 // Nhận diện giọng nói tiếng Anh (Chrome, Edge, Safari). Trả null nếu máy không hỗ trợ.

@@ -1,6 +1,10 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { TOPICS, ACTIVITIES, shuffle, pick, options } from './data.js';
-import { speak, cheer, oops, buzz, pop, finish, listenEn, canListen, setSoundEnabled, stopSpeaking } from './sound.js';
+import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { TOPICS, ACTIVITIES, PLAYERS, shuffle, pick, options } from './data.js';
+import { speak, cheer, oops, buzz, pop, finish, listenEn, canListen, setSoundEnabled, stopSpeaking, setPlayer } from './sound.js';
+
+// Bé đang chơi
+const PlayerCtx = createContext(PLAYERS[0]);
+const usePlayer = () => useContext(PlayerCtx);
 
 // ---------- Lưu tiến độ trên máy ----------
 const store = {
@@ -40,21 +44,39 @@ export default function App() {
   const [topic, setTopic] = useState(null);
   const [activity, setActivity] = useState(null);
   const [soundOn, setSoundOn] = useState(() => store.get('sound', true));
-  const [stars, setStars] = useState(() => store.get('stars', {}));
+  const [player, setPlayerState] = useState(() => PLAYERS.find((p) => p.id === store.get('player')) || PLAYERS[0]);
+  const [allStars, setAllStars] = useState(() => store.get('starsByPlayer', {}));
+  const stars = allStars[player.id] || {};
   const [playId, setPlayId] = useState(0);
 
   useEffect(() => {
     setSoundEnabled(soundOn);
     store.set('sound', soundOn);
   }, [soundOn]);
-  useEffect(() => store.set('stars', stars), [stars]);
+  useEffect(() => store.set('starsByPlayer', allStars), [allStars]);
+  useEffect(() => {
+    setPlayer(player);
+    store.set('player', player.id);
+  }, [player]);
 
   const saveStars = (n) =>
-    setStars((s) => {
-      const t = { ...(s[topic.id] || {}) };
+    setAllStars((all) => {
+      const mine = { ...(all[player.id] || {}) };
+      const t = { ...(mine[topic.id] || {}) };
       t[activity.id] = Math.max(t[activity.id] || 0, n);
-      return { ...s, [topic.id]: t };
+      mine[topic.id] = t;
+      return { ...all, [player.id]: mine };
     });
+
+  const choosePlayer = async (p) => {
+    pop();
+    setPlayer(p);
+    setPlayerState(p);
+    setScreen('topics');
+    await speak(`Xin chào ${p.name}!`, 'vi');
+    await speak(`Hello ${p.short}! Let's learn English!`, 'en', { queue: true });
+    speak(`${p.name} muốn học chủ đề nào?`, 'vi', { queue: true });
+  };
 
   const openTopic = (t) => {
     pop();
@@ -81,19 +103,13 @@ export default function App() {
   };
 
   return (
+    <PlayerCtx.Provider value={player}>
     <div className="app">
       <button className="sound-btn" onClick={() => setSoundOn(!soundOn)} aria-label="Bật tắt âm thanh">
         {soundOn ? '🔊' : '🔇'}
       </button>
 
-      {screen === 'welcome' && (
-        <Welcome
-          onStart={() => {
-            setScreen('topics');
-            speak('Nic Sún Răng muốn học chủ đề nào?', 'vi');
-          }}
-        />
-      )}
+      {screen === 'welcome' && <Welcome onPick={choosePlayer} />}
       {screen === 'topics' && <Topics stars={stars} onPick={openTopic} onBack={() => setScreen('welcome')} />}
       {screen === 'activities' && topic && (
         <Activities topic={topic} stars={stars[topic.id] || {}} onPick={openActivity} onBack={toTopics} />
@@ -116,6 +132,7 @@ export default function App() {
         />
       )}
     </div>
+    </PlayerCtx.Provider>
   );
 }
 
@@ -126,40 +143,42 @@ function Pic({ pic }) {
   return <span className="emoji">{pic}</span>;
 }
 
-// ---------- Màn chào ----------
-function Welcome({ onStart }) {
-  const greet = async () => {
-    await speak('Xin chào Nic Sún Răng!', 'vi');
-    speak("Hello Nic! Let's learn English!", 'en', { queue: true });
-  };
+// ---------- Màn chào: chọn bé đang chơi ----------
+function Welcome({ onPick }) {
+  const greet = () => speak('Xin chào các bé! Bé nào đang chơi đây nhỉ?', 'vi');
   useEffect(() => {
     greet();
   }, []);
 
   return (
-    <div className="screen welcome" onClick={greet}>
-      <div className="tooth-face">😁</div>
+    <div className="screen welcome">
+      <div className="tooth-face">👋</div>
       <h1 className="hello">
         Xin Chào
         <br />
-        <span>Nic Sún Răng</span>
+        <span>các bé!</span>
       </h1>
-      <p className="sub">🦷 Hello Nic! Let's learn English! 🇬🇧</p>
-      <button
-        className="big-btn"
-        onClick={(e) => {
-          e.stopPropagation();
-          onStart();
-        }}
-      >
-        ▶ Let's go!
-      </button>
+      <p className="sub">🇬🇧 Let's learn English! Bé nào đang chơi?</p>
+      <div className="players">
+        {PLAYERS.map((p) => (
+          <button
+            key={p.id}
+            className="player-btn"
+            style={{ background: p.color, boxShadow: `0 8px 0 ${p.shadow}` }}
+            onClick={() => onPick(p)}
+          >
+            <span className="player-face">{p.face}</span>
+            <span className="player-name">{p.name}</span>
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
 
 // ---------- Chọn chủ đề ----------
 function Topics({ stars, onPick, onBack }) {
+  const player = usePlayer();
   const max = STAR_ACTIVITIES.length * 3;
   const total = Object.values(stars).reduce((n, t) => n + Object.values(t).reduce((a, b) => a + b, 0), 0);
   const group = (g, label) => (
@@ -189,8 +208,11 @@ function Topics({ stars, onPick, onBack }) {
         <button className="back" onClick={onBack}>
           ⬅
         </button>
-        <h2 className="title">Chọn chủ đề nào Nic! 📚</h2>
+        <h2 className="title">Chọn chủ đề nào {player.short}! 📚</h2>
       </div>
+      <button className="player-chip" onClick={onBack}>
+        {player.face} {player.name} · <u>đổi bé</u>
+      </button>
       <div className="star-total">🌟 Tổng: {total} sao</div>
       {group(2, '📗 Lớp 2 – theo sách Tiếng Anh 2')}
       {group(1, '📘 Ôn lại lớp 1')}
@@ -310,6 +332,7 @@ function buildQueue(topic, activity) {
 }
 
 function Session({ topic, activity, onBack, onReplay, onStars }) {
+  const player = usePlayer();
   const queue = useMemo(() => buildQueue(topic, activity), []);
   const [i, setI] = useState(0);
   const mistakes = useRef(0); // số câu có làm sai
@@ -367,7 +390,7 @@ function Session({ topic, activity, onBack, onReplay, onStars }) {
           ))}
         </div>
         <h2 className="title">{result === 3 ? 'Tuyệt cú mèo!' : result === 2 ? 'Giỏi lắm!' : 'Cố lên nào!'}</h2>
-        <p className="sub">{mistakes.current === 0 ? 'Không sai câu nào luôn!' : `Nic Sún Răng làm sai ${mistakes.current} câu`}</p>
+        <p className="sub">{mistakes.current === 0 ? 'Không sai câu nào luôn!' : `${player.name} làm sai ${mistakes.current} câu`}</p>
         <div className="nav">
           <button className="big-btn small" onClick={onReplay}>
             🔁 Chơi lại
@@ -603,6 +626,7 @@ function matches(heard, word) {
 }
 
 function SpeakQ({ word, onRight, onWrong }) {
+  const player = usePlayer();
   const [state, setState] = useState('idle'); // idle | listening | manual
   const [heard, setHeard] = useState('');
   const [tries, setTries] = useState(0);
@@ -653,7 +677,7 @@ function SpeakQ({ word, onRight, onWrong }) {
           <button className={'mic' + (state === 'listening' ? ' on' : '')} onClick={mic}>
             🎤
           </button>
-          <div className="mic-hint">{state === 'listening' ? 'Nic nói đi…' : 'Bấm micro rồi nói'}</div>
+          <div className="mic-hint">{state === 'listening' ? `${player.short} nói đi…` : 'Bấm micro rồi nói'}</div>
           {heard && <div className="heard">Máy nghe được: “{heard}”</div>}
           {tries >= 3 && (
             <button className="pill" onClick={() => onRight(word.en)}>
@@ -665,7 +689,7 @@ function SpeakQ({ word, onRight, onWrong }) {
 
       {manual && (
         <>
-          <div className="mic-hint">Máy này chưa nghe được micro. Bố mẹ nghe Nic nói rồi chấm nhé:</div>
+          <div className="mic-hint">Máy này chưa nghe được micro. Bố mẹ nghe {player.short} nói rồi chấm nhé:</div>
           <div className="nav">
             <button className="big-btn small" onClick={() => onRight(word.en)}>
               ✅ Nói đúng rồi
