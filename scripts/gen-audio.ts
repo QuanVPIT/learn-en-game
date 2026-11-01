@@ -69,7 +69,11 @@ async function main() {
       } catch (e) {
         failed++;
         console.error(`\n⚠️  Lỗi "${item.text}": ${(e as Error).message}`);
-        if (String(e).includes('403') || String(e).includes('400')) process.exit(1);
+        // Lỗi key / quyền thì dừng luôn, không gọi tiếp
+        if (/^(400|401|403) /.test((e as Error).message)) {
+          console.error('\n❌ Key không dùng được với Text-to-Speech. Xem README phần "Giọng đọc AI".');
+          process.exit(1);
+        }
       }
       done++;
       process.stdout.write(`\r   ${done}/${todo.length}`);
