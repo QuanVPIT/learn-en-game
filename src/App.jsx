@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { TOPICS, ACTIVITIES, PLAYERS, shuffle, pick, options } from './data.js';
-import { speak, cheer, oops, buzz, pop, finish, listenEn, canListen, setSoundEnabled, stopSpeaking, setPlayer } from './sound.js';
+import { TOPICS, ACTIVITIES, PLAYERS, GRADES, shuffle, pick, options } from './data.js';
+import { speak, cheer, oops, buzz, pop, finish, beep, setSoundEnabled, stopSpeaking, setPlayer } from './sound.js';
+import { listen, canRecognize, canRecord, inAppBrowser, startRecording, playUrl, scoreSpeech, passScore, ERROR_TEXT } from './speech.js';
 
 // Bé đang chơi
 const PlayerCtx = createContext(PLAYERS[0]);
@@ -181,9 +182,10 @@ function Topics({ stars, onPick, onBack }) {
   const player = usePlayer();
   const max = STAR_ACTIVITIES.length * 3;
   const total = Object.values(stars).reduce((n, t) => n + Object.values(t).reduce((a, b) => a + b, 0), 0);
-  const group = (g, label) => (
+  const [grade, setGrade] = useState(() => store.get('grade', 2));
+  useEffect(() => store.set('grade', grade), [grade]);
+  const group = (g) => (
     <>
-      <h3 className="group">{label}</h3>
       <div className="topic-grid">
         {TOPICS.filter((t) => t.grade === g).map((t) => {
           const got = Object.values(stars[t.id] || {}).reduce((a, b) => a + b, 0);
@@ -214,8 +216,22 @@ function Topics({ stars, onPick, onBack }) {
         {player.face} {player.name} · <u>đổi bé</u>
       </button>
       <div className="star-total">🌟 Tổng: {total} sao</div>
-      {group(2, '📗 Lớp 2 – theo sách Tiếng Anh 2')}
-      {group(1, '📘 Ôn lại lớp 1')}
+      <div className="grade-tabs">
+        {GRADES.map((g) => (
+          <button
+            key={g.id}
+            className={grade === g.id ? 'on' : ''}
+            onClick={() => {
+              pop();
+              setGrade(g.id);
+            }}
+          >
+            {g.label}
+            <small>{g.note}</small>
+          </button>
+        ))}
+      </div>
+      {group(grade)}
     </div>
   );
 }
@@ -290,9 +306,7 @@ function Learn({ topic, onBack, onPractice }) {
         <span className="flash-vi">{w.vi}</span>
       </button>
 
-      <button className="pill" onClick={() => speak(topic.sentence(w), 'en')}>
-        💬 {topic.sentence(w)}
-      </button>
+      <Dialog topic={topic} word={w} />
 
       <div className="nav">
         <button className="round" disabled={i === 0} onClick={() => setI(i - 1)}>
@@ -315,17 +329,37 @@ function Learn({ topic, onBack, onPractice }) {
   );
 }
 
+// Câu mẫu (lớp 3 có cả câu hỏi và câu trả lời)
+function Dialog({ topic, word }) {
+  const sentence = topic.sentence(word);
+  const lines = topic.ask ? (sentence.endsWith('?') ? [sentence, topic.ask] : [topic.ask, sentence]) : [sentence];
+  const play = async () => {
+    for (let k = 0; k < lines.length; k++) await speak(lines[k], 'en', { queue: k > 0 });
+  };
+  return (
+    <button className="dialog" onClick={play}>
+      {lines.map((l, k) => (
+        <span key={k} className={'line' + (k % 2 ? ' reply' : '')}>
+          {k === 0 ? '💬' : '↪️'} {l}
+        </span>
+      ))}
+    </button>
+  );
+}
+
 // ---------- Một lượt chơi: 8 câu, tính sao ----------
 const MIXED = ['listen', 'read', 'readSentence', 'spell', 'sentence'];
 
 function buildQueue(topic, activity) {
   const canSpell = (w) => !w.en.includes(' ');
   let words = shuffle(topic.words);
-  if (activity.id === 'spell') words = words.filter(canSpell);
+  // Chủ đề toàn cụm từ (vd "stand up") thì không ghép chữ được, chuyển sang xếp câu
+  if (activity.id === 'spell' && words.some(canSpell)) words = words.filter(canSpell);
   while (words.length < QUESTIONS) words = words.concat(shuffle(words));
   return words.slice(0, QUESTIONS).map((word, k) => {
     let type = activity.id;
     if (type === 'read') type = k % 2 ? 'readSentence' : 'read';
+    if (type === 'spell' && !canSpell(word)) type = 'sentence';
     if (type === 'challenge') type = pick(MIXED.filter((t) => t !== 'spell' || canSpell(word)));
     return { word, type };
   });
@@ -427,6 +461,7 @@ function Session({ topic, activity, onBack, onReplay, onStars }) {
         {q.type === 'spell' && <SpellQ {...props} />}
         {q.type === 'sentence' && <SentenceQ {...props} />}
         {q.type === 'speak' && <SpeakQ {...props} />}
+        {q.type === 'speakSentence' && <SpeakQ {...props} sentenceMode />}
       </div>
 
       <div className="message">{msg}</div>
@@ -594,108 +629,213 @@ function SentenceQ({ topic, word, onRight, onWrong }) {
   );
 }
 
-// ---------- Nói: bé nói từ, máy nghe và chấm ----------
-const SOUND_ALIKE = {
-  one: ['won', '1'],
-  two: ['to', 'too', '2'],
-  four: ['for', '4'],
-  eight: ['ate', '8'],
-  sea: ['see', 'c'],
-  sun: ['son'],
-  bear: ['bare'],
-  eye: ['i', 'aye'],
-  tea: ['tee', 't'],
-  ear: ['year'],
-  hen: ['ten'],
-  pen: ['pan', 'ben'],
-  jeans: ['genes'],
-  bye: ['by', 'buy'],
-};
-
-const norm = (s) => s.toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
-
-function matches(heard, word) {
-  const target = norm(word.en);
-  const ok = [target, ...(SOUND_ALIKE[target] || [])];
-  if (/^\d+$/.test(word.pic)) ok.push(word.pic);
-  return heard.some((h) => {
-    const n = norm(h);
-    const words = n.split(' ');
-    return ok.some((o) => n === o || words.includes(o) || (o.includes(' ') && n.includes(o)) || n.replace(/s$/, '') === o);
-  });
-}
-
-function SpeakQ({ word, onRight, onWrong }) {
+// ---------- Nói: bé nói từ hoặc câu, máy nghe và chấm ----------
+function SpeakQ({ topic, word, sentenceMode, onRight, onWrong }) {
   const player = usePlayer();
-  const [state, setState] = useState('idle'); // idle | listening | manual
-  const [heard, setHeard] = useState('');
+  const target = sentenceMode ? topic.sentence(word) : word.en;
+  const recognize = canRecognize() && !inAppBrowser();
+  const [mode, setMode] = useState(recognize ? 'auto' : canRecord() ? 'record' : 'parent');
+  const [state, setState] = useState('idle'); // idle | listening | recording | recorded
+  const [live, setLive] = useState('');
+  const [result, setResult] = useState(null); // { score, words, heard }
+  const [error, setError] = useState('');
   const [tries, setTries] = useState(0);
+  const [myVoice, setMyVoice] = useState(null);
+  const session = useRef(null);
   const alive = useAlive();
-  const supported = canListen();
 
+  const model = () => speak(target, 'en', { rate: sentenceMode ? 0.75 : 0.7 });
   useEffect(() => {
-    speak(word.en, 'en');
+    model();
+    return () => session.current?.stop?.();
   }, []);
 
-  const mic = async () => {
-    if (state === 'listening') return;
-    setState('listening');
-    setHeard('');
-    const r = await listenEn();
-    if (!alive.current) return;
-    if (!r || r.error === 'not-allowed' || r.error === 'service-not-allowed') {
-      setState('manual');
+  // --- Máy tự nghe và chấm ---
+  const startAuto = async () => {
+    if (state === 'listening') {
+      session.current?.stop();
       return;
     }
+    setError('');
+    setResult(null);
+    setLive('');
+    beep();
+    const s = listen({ onLive: (t) => alive.current && setLive(t) });
+    if (!s) return setMode(canRecord() ? 'record' : 'parent');
+    session.current = s;
+    setState('listening');
+    const r = await s.done;
+    if (!alive.current) return;
     setState('idle');
-    setHeard(r.heard[0] || '…');
-    if (matches(r.heard, word)) {
-      onRight(word.en);
+    if (r.error && !r.heard.length) {
+      setError(ERROR_TEXT[r.error] || 'Máy chưa nghe được, con thử lại nhé!');
+      // Lỗi quyền / dịch vụ: chuyển sang thu âm để bé vẫn nói được
+      if (['not-allowed', 'service-not-allowed', 'network', 'language-not-supported', 'audio-capture'].includes(r.error))
+        setMode(canRecord() && r.error !== 'audio-capture' && r.error !== 'not-allowed' ? 'record' : 'parent');
+      return;
+    }
+    const sc = scoreSpeech(r.heard, target);
+    setResult(sc);
+    if (sc.score >= passScore(target)) {
+      onRight(null);
     } else {
       setTries((t) => t + 1);
-      onWrong();
+      onWrong(true);
+      speak(sc.score >= 0.4 ? `Gần đúng rồi! ${player.name} nói lại nha!` : `${player.name} nghe mẫu rồi nói lại nha!`, 'vi');
     }
   };
 
-  const manual = !supported || state === 'manual';
+  // --- Thu âm, bé nghe lại giọng mình, bố mẹ chấm ---
+  const startRecord = async () => {
+    if (state === 'recording') {
+      const url = await session.current.stop();
+      if (!alive.current) return;
+      setMyVoice(url);
+      setState('recorded');
+      playUrl(url);
+      return;
+    }
+    setError('');
+    try {
+      beep();
+      const r = await startRecording();
+      session.current = r;
+      setState('recording');
+      r.stopped.then((url) => {
+        if (!alive.current) return;
+        setMyVoice(url);
+        setState('recorded');
+      });
+    } catch {
+      setError('Không mở được micro. Bố mẹ cho phép dùng micro, hoặc nghe bé nói rồi chấm nhé.');
+      setMode('parent');
+    }
+  };
+
+  const percent = result ? Math.round(result.score * 100) : 0;
 
   return (
     <div className="speak">
-      <span className="ask-pic big">
+      <span className="ask-pic">
         <Pic pic={word.pic} />
       </span>
-      <div className="read-word">
-        {word.en}
-        <small>{word.vi}</small>
-      </div>
-      <button className="pill" onClick={() => speak(word.en, 'en')}>
-        🔊 Nghe mẫu
-      </button>
 
-      {!manual && (
+      {/* Từ / câu cần nói, tô màu từng từ sau khi chấm */}
+      <div className={sentenceMode ? 'read-sentence' : 'read-word'}>
+        <span className="say-words">
+          {result
+            ? target.split(' ').map((w, k) => (
+                <span key={k} className={result.words[k]?.ok ? 'ok' : 'miss'}>
+                  {w}{' '}
+                </span>
+              ))
+            : target}
+        </span>
+        <small>{sentenceMode ? word.vi + ' – nói cả câu' : word.vi}</small>
+      </div>
+
+      <div className="nav">
+        <button className="pill" onClick={model}>
+          🔊 Nghe mẫu
+        </button>
+        <button className="pill" onClick={() => speak(target, 'en', { rate: 0.5 })}>
+          🐢 Nghe chậm
+        </button>
+      </div>
+
+      {mode === 'auto' && (
         <>
-          <button className={'mic' + (state === 'listening' ? ' on' : '')} onClick={mic}>
-            🎤
+          <button className={'mic' + (state === 'listening' ? ' on' : '')} onClick={startAuto}>
+            {state === 'listening' ? '👂' : '🎤'}
           </button>
-          <div className="mic-hint">{state === 'listening' ? `${player.short} nói đi…` : 'Bấm micro rồi nói'}</div>
-          {heard && <div className="heard">Máy nghe được: “{heard}”</div>}
-          {tries >= 3 && (
-            <button className="pill" onClick={() => onRight(word.en)}>
-              ⏭ Qua câu khác
-            </button>
+          <div className="mic-hint">
+            {state === 'listening' ? `${player.short} nói đi… (bấm lần nữa khi nói xong)` : 'Bấm micro rồi nói to, rõ nhé'}
+          </div>
+          {state === 'listening' && <div className="heard live">{live || '…'}</div>}
+          {result && state !== 'listening' && (
+            <div className="heard">
+              Máy nghe được: “{result.heard || '…'}” · <b>{percent}%</b>
+            </div>
           )}
         </>
       )}
 
-      {manual && (
+      {mode === 'record' && (
         <>
-          <div className="mic-hint">Máy này chưa nghe được micro. Bố mẹ nghe {player.short} nói rồi chấm nhé:</div>
+          <button className={'mic' + (state === 'recording' ? ' on rec' : '')} onClick={startRecord}>
+            {state === 'recording' ? '⏹️' : '🎤'}
+          </button>
+          <div className="mic-hint">
+            {state === 'recording' ? `${player.short} nói đi… rồi bấm ⏹️` : 'Bấm micro để thu giọng, rồi nghe lại so với mẫu'}
+          </div>
+          {myVoice && state === 'recorded' && (
+            <>
+              <div className="nav">
+                <button className="pill" onClick={() => playUrl(myVoice)}>
+                  ▶️ Nghe giọng {player.short}
+                </button>
+              </div>
+              <div className="mic-hint">Bố mẹ nghe thử rồi chấm:</div>
+              <div className="nav">
+                <button className="big-btn small" onClick={() => onRight(null)}>
+                  ✅ Nói đúng rồi
+                </button>
+                <button
+                  className="big-btn small alt"
+                  onClick={() => {
+                    setMyVoice(null);
+                    setState('idle');
+                    onWrong(true);
+                    model();
+                  }}
+                >
+                  🔁 Nói lại
+                </button>
+              </div>
+            </>
+          )}
+        </>
+      )}
+
+      {mode === 'parent' && (
+        <>
+          <div className="mic-hint">Bố mẹ nghe {player.short} nói theo mẫu rồi chấm nhé:</div>
           <div className="nav">
-            <button className="big-btn small" onClick={() => onRight(word.en)}>
+            <button className="big-btn small" onClick={() => onRight(null)}>
               ✅ Nói đúng rồi
             </button>
+            {(recognize || canRecord()) && (
+              <button
+                className="pill"
+                onClick={() => {
+                  setError('');
+                  setMode(recognize ? 'auto' : 'record');
+                }}
+              >
+                🎤 Thử lại micro
+              </button>
+            )}
           </div>
         </>
+      )}
+
+      {error && <div className="speak-error">⚠️ {error}</div>}
+      {mode === 'auto' && inAppBrowser() === false && tries >= 2 && (
+        <div className="nav">
+          {canRecord() && (
+            <button className="pill" onClick={() => setMode('record')}>
+              🎙️ Thu âm, bố mẹ chấm
+            </button>
+          )}
+          <button className="pill" onClick={() => onRight(null)}>
+            ⏭ Qua câu khác
+          </button>
+        </div>
+      )}
+      {inAppBrowser() && (
+        <div className="speak-error">
+          💡 Đang mở trong Zalo/Facebook nên máy không nghe được. Bấm ⋯ rồi chọn “Mở bằng trình duyệt” (Safari/Chrome) để bé nói và máy chấm.
+        </div>
       )}
     </div>
   );

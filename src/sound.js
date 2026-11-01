@@ -238,25 +238,9 @@ export function finish(stars) {
   return stars === 3 && DONE_OWN[player.id] ? `${text} ${DONE_OWN[player.id]}` : text;
 }
 
-// Nhận diện giọng nói tiếng Anh (Chrome, Edge, Safari). Trả null nếu máy không hỗ trợ.
-export function listenEn() {
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR) return null;
-  return new Promise((resolve) => {
-    const rec = new SR();
-    rec.lang = 'en-US';
-    rec.maxAlternatives = 5;
-    rec.interimResults = false;
-    let heard = [];
-    rec.onresult = (e) => {
-      heard = Array.from(e.results[0]).map((r) => r.transcript);
-    };
-    rec.onerror = (e) => resolve({ heard: [], error: e.error });
-    rec.onend = () => resolve({ heard });
-    stopSpeaking();
-    rec.start();
-    setTimeout(() => rec.stop(), 5000);
-  });
-}
 
-export const canListen = () => !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+
+// Tiếng "bíp" báo hiệu máy bắt đầu nghe
+export function beep() {
+  tone(880, 0, 0.12, { vol: 0.2 });
+}

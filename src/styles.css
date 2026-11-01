@@ -748,3 +748,97 @@ button:disabled {
   padding: 4px 16px;
   box-shadow: 0 3px 0 #0002;
 }
+
+/* ---------- Chọn lớp ---------- */
+.grade-tabs {
+  display: flex;
+  gap: 10px;
+  background: #fff8;
+  padding: 6px;
+  border-radius: 999px;
+}
+
+.grade-tabs button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 4px 18px;
+  border-radius: 999px;
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.grade-tabs button small {
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0.75;
+}
+
+.grade-tabs button.on {
+  background: #ff5d8f;
+  color: #fff;
+  box-shadow: 0 4px 0 #c93a68;
+}
+
+/* ---------- Hội thoại mẫu ---------- */
+.dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: stretch;
+  max-width: 600px;
+  width: 100%;
+}
+
+.dialog .line {
+  background: #fff;
+  border-radius: 20px;
+  padding: 6px 16px;
+  font-size: clamp(17px, 4.2vw, 22px);
+  font-weight: 700;
+  box-shadow: 0 4px 0 #0002;
+  text-align: left;
+  align-self: flex-start;
+}
+
+.dialog .line.reply {
+  align-self: flex-end;
+  background: #e3f6ff;
+}
+
+/* ---------- Nói ---------- */
+.say-words .ok {
+  color: #2e9e44;
+}
+
+.say-words .miss {
+  color: #e53935;
+  text-decoration: underline wavy #e5393588;
+}
+
+.heard.live {
+  font-style: italic;
+  min-width: 160px;
+  text-align: center;
+  border: 2px dashed #4cd964;
+}
+
+.mic.rec.on {
+  background: #e53935;
+  box-shadow: 0 0 0 12px #e5393544, 0 7px 0 #a32020;
+}
+
+.speak-error {
+  max-width: 520px;
+  background: #fff3cd;
+  border-radius: 16px;
+  padding: 8px 14px;
+  font-weight: 700;
+  font-size: 16px;
+  text-align: center;
+}
+
+.speak .ask-pic {
+  font-size: clamp(64px, 16vw, 110px);
+}
