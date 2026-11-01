@@ -13,7 +13,8 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "audio": "tsx scripts/gen-audio.ts",
-    "check": "npm run typecheck && npm run lint && npm run test"
+    "check": "npm run typecheck && npm run lint && npm run test",
+    "audio:mac": "tsx scripts/gen-audio.ts --mac"
   },
   "dependencies": {
     "react": "^18.3.1",

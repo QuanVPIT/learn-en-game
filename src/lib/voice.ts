@@ -1,4 +1,4 @@
-// Giọng đọc: ưu tiên file mp3 giọng AI tạo sẵn (public/audio, xem scripts/gen-audio.ts);
+// Giọng đọc: ưu tiên file giọng đọc tạo sẵn (public/audio, xem scripts/gen-audio.ts);
 // câu nào chưa có file thì dùng giọng có sẵn của trình duyệt.
 import type { Lang } from '../data/types';
 import { audioKey } from './audioKey';
@@ -13,12 +13,17 @@ export interface SpeakOpts {
 
 const BASE = `${import.meta.env.BASE_URL}audio/`;
 let manifest: Set<string> | null = null;
+let ext = 'mp3';
 
-/** Tải danh sách file giọng đọc có sẵn */
+/** Tải danh sách file giọng đọc có sẵn: { ext: 'm4a' | 'mp3', files: [...] } */
 export async function loadVoiceManifest() {
   try {
     const res = await fetch(`${BASE}manifest.json`, { cache: 'no-cache' });
-    if (res.ok) manifest = new Set((await res.json()) as string[]);
+    if (!res.ok) return;
+    const data = (await res.json()) as { ext?: string; files?: string[] } | string[];
+    const files = Array.isArray(data) ? data : (data.files ?? []);
+    if (!Array.isArray(data) && data.ext) ext = data.ext;
+    manifest = new Set(files);
   } catch {
     manifest = null;
   }
@@ -26,7 +31,7 @@ export async function loadVoiceManifest() {
 
 export const hasRecorded = (lang: Lang, text: string) => !!manifest?.has(audioKey(lang, text));
 
-// ---------- Phát mp3 ----------
+// ---------- Phát file giọng đọc ----------
 // Dùng chung một thẻ audio: trên iPhone, sau lần chạm đầu tiên thì phát tiếp không bị chặn
 const player = typeof Audio !== 'undefined' ? new Audio() : null;
 let endCurrent: (() => void) | null = null;
@@ -116,7 +121,7 @@ export function speak(text: string, lang: Lang = 'en', opts: SpeakOpts = {}): Pr
   const run = () => {
     if (my !== generation || !isSoundOn() || !text) return Promise.resolve();
     const slow = !!opts.slow;
-    return hasRecorded(lang, text) ? playFile(`${BASE}${audioKey(lang, text)}.mp3`, slow) : synth(text, lang, slow);
+    return hasRecorded(lang, text) ? playFile(`${BASE}${audioKey(lang, text)}.${ext}`, slow) : synth(text, lang, slow);
   };
   tail = (opts.queue ? tail : Promise.resolve()).then(run, run);
   return tail;
