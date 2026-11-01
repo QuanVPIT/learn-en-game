@@ -1,21 +1,68 @@
 // Phần "Nói": nghe giọng bé (nhận diện giọng nói của trình duyệt), chấm điểm dễ tính cho trẻ,
 // và thu âm để bé nghe lại giọng mình khi máy không nhận diện được.
-import { stopSpeaking } from './sound.js';
+import { stopSpeaking } from './voice';
 
-const SR = typeof window !== 'undefined' ? window.SpeechRecognition || window.webkitSpeechRecognition : null;
+// Kiểu tối giản cho Web Speech API (TypeScript chưa có sẵn)
+interface RecAlt {
+  transcript: string;
+}
+interface RecResult {
+  isFinal: boolean;
+  length: number;
+  [i: number]: RecAlt;
+}
+interface RecEvent {
+  results: { length: number; [i: number]: RecResult };
+}
+interface Recognizer {
+  lang: string;
+  interimResults: boolean;
+  maxAlternatives: number;
+  continuous: boolean;
+  onresult: ((e: RecEvent) => void) | null;
+  onerror: ((e: { error: string }) => void) | null;
+  onend: (() => void) | null;
+  start(): void;
+  stop(): void;
+}
+type RecognizerCtor = new () => Recognizer;
+
+const SR: RecognizerCtor | null =
+  typeof window !== 'undefined'
+    ? ((window as unknown as { SpeechRecognition?: RecognizerCtor; webkitSpeechRecognition?: RecognizerCtor })
+        .SpeechRecognition ??
+      (window as unknown as { webkitSpeechRecognition?: RecognizerCtor }).webkitSpeechRecognition ??
+      null)
+    : null;
+
+export interface ListenResult {
+  heard: string[];
+  error?: string;
+}
+export interface ListenSession {
+  done: Promise<ListenResult>;
+  stop: () => void;
+}
+export interface Score {
+  score: number;
+  words: { w: string; ok: boolean }[];
+  heard: string;
+}
 
 export const canRecognize = () => !!SR;
-export const canRecord = () => !!(navigator.mediaDevices?.getUserMedia && window.MediaRecorder);
+export const canRecord = () =>
+  typeof navigator.mediaDevices?.getUserMedia === 'function' && typeof MediaRecorder !== 'undefined';
 
 // Trình duyệt trong app (Zalo, Facebook, Messenger, Instagram...) thường chặn micro
 export const inAppBrowser = () => /FBAN|FBAV|FB_IAB|Zalo|Instagram|Line\/|Messenger|TikTok/i.test(navigator.userAgent);
 
 // Lời giải thích lỗi bằng tiếng Việt
-export const ERROR_TEXT = {
+export const ERROR_TEXT: Record<string, string> = {
   'no-speech': 'Máy chưa nghe thấy gì. Con nói to và gần micro hơn nhé!',
   'audio-capture': 'Không tìm thấy micro trên máy này.',
   'not-allowed': 'Chưa cho phép dùng micro. Bố mẹ bấm "Cho phép" khi trình duyệt hỏi nhé.',
-  'service-not-allowed': 'Máy chưa bật nhận diện giọng nói. Trên iPhone/iPad: Cài đặt → Cài đặt chung → Bàn phím → bật Đọc chính tả. Hoặc mở bằng Chrome.',
+  'service-not-allowed':
+    'Máy chưa bật nhận diện giọng nói. Trên iPhone/iPad: Cài đặt → Cài đặt chung → Bàn phím → bật Đọc chính tả. Hoặc mở bằng Chrome.',
   network: 'Nhận diện giọng nói cần có mạng internet.',
   'language-not-supported': 'Máy chưa hỗ trợ nghe tiếng Anh.',
   aborted: 'Đã dừng nghe.',
@@ -24,7 +71,10 @@ export const ERROR_TEXT = {
 
 // Bắt đầu nghe. onLive(text) nhận chữ máy nghe được ngay khi bé đang nói.
 // Trả về { done: Promise<{heard: string[], error?}>, stop() }
-export function listen({ onLive, maxMs = 7000 } = {}) {
+export function listen({
+  onLive,
+  maxMs = 7000,
+}: { onLive?: (t: string) => void; maxMs?: number } = {}): ListenSession | null {
   if (!SR) return null;
   stopSpeaking();
   const rec = new SR();
@@ -33,12 +83,12 @@ export function listen({ onLive, maxMs = 7000 } = {}) {
   rec.maxAlternatives = 5;
   rec.continuous = false;
 
-  let finals = [];
+  let finals: string[] = [];
   let live = '';
   let settled = false;
-  let resolveFn;
-  const done = new Promise((r) => (resolveFn = r));
-  const finish = (extra = {}) => {
+  let resolveFn: (r: ListenResult) => void = () => {};
+  const done = new Promise<ListenResult>((r) => (resolveFn = r));
+  const finish = (extra: { error?: string } = {}) => {
     if (settled) return;
     settled = true;
     clearTimeout(timer);
@@ -51,7 +101,7 @@ export function listen({ onLive, maxMs = 7000 } = {}) {
     for (let i = 0; i < e.results.length; i++) {
       const res = e.results[i];
       text += res[0].transcript;
-      if (res.isFinal) finals = Array.from(res).map((alt) => alt.transcript);
+      if (res.isFinal) finals = Array.from({ length: res.length }, (_, k) => res[k].transcript);
     }
     live = text.trim();
     onLive?.(live);
@@ -66,7 +116,9 @@ export function listen({ onLive, maxMs = 7000 } = {}) {
   const timer = setTimeout(() => {
     try {
       rec.stop();
-    } catch {}
+    } catch {
+      /* đã dừng */
+    }
     setTimeout(() => finish(), 800);
   }, maxMs);
 
@@ -81,18 +133,25 @@ export function listen({ onLive, maxMs = 7000 } = {}) {
     stop: () => {
       try {
         rec.stop();
-      } catch {}
+      } catch {
+        /* đã dừng */
+      }
     },
   };
 }
 
 // ---------- Thu âm để bé nghe lại giọng mình ----------
-export async function startRecording() {
+export interface Recording {
+  stop: () => Promise<string>;
+  stopped: Promise<string>;
+}
+
+export async function startRecording(): Promise<Recording> {
   const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
   const rec = new MediaRecorder(stream);
-  const chunks = [];
+  const chunks: Blob[] = [];
   rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
-  const stopped = new Promise((resolve) => {
+  const stopped = new Promise<string>((resolve) => {
     rec.onstop = () => {
       stream.getTracks().forEach((t) => t.stop());
       const blob = new Blob(chunks, { type: rec.mimeType || 'audio/webm' });
@@ -111,7 +170,7 @@ export async function startRecording() {
   };
 }
 
-export function playUrl(url) {
+export function playUrl(url: string) {
   stopSpeaking();
   const a = new Audio(url);
   a.play().catch(() => {});
@@ -119,7 +178,7 @@ export function playUrl(url) {
 
 // ---------- Chấm điểm phát âm (dễ tính cho trẻ) ----------
 // Từ hay bị máy nghe nhầm sang từ đồng âm
-const SOUND_ALIKE = {
+const SOUND_ALIKE: Record<string, string[]> = {
   one: ['won', '1'],
   two: ['to', 'too', '2'],
   four: ['for', '4'],
@@ -146,9 +205,25 @@ const SOUND_ALIKE = {
   mai: ['my', 'may', 'mine'],
 };
 
-const NUM_WORDS = { 1: 'one', 2: 'two', 3: 'three', 4: 'four', 5: 'five', 6: 'six', 7: 'seven', 8: 'eight', 9: 'nine', 10: 'ten', 11: 'eleven', 12: 'twelve', 13: 'thirteen', 15: 'fifteen', 20: 'twenty' };
+const NUM_WORDS: Record<string, string> = {
+  1: 'one',
+  2: 'two',
+  3: 'three',
+  4: 'four',
+  5: 'five',
+  6: 'six',
+  7: 'seven',
+  8: 'eight',
+  9: 'nine',
+  10: 'ten',
+  11: 'eleven',
+  12: 'twelve',
+  13: 'thirteen',
+  15: 'fifteen',
+  20: 'twenty',
+};
 
-export const norm = (s) =>
+export const norm = (s: string) =>
   s
     .toLowerCase()
     .replace(/’/g, "'")
@@ -158,7 +233,7 @@ export const norm = (s) =>
     .replace(/\s+/g, ' ')
     .trim();
 
-function lev(a, b) {
+function lev(a: string, b: string) {
   const dp = Array.from({ length: b.length + 1 }, (_, j) => j);
   for (let i = 1; i <= a.length; i++) {
     let prev = dp[0];
@@ -173,7 +248,7 @@ function lev(a, b) {
 }
 
 // Độ giống nhau của 2 từ: 1 = giống hệt
-function wordSim(target, said) {
+function wordSim(target: string, said: string) {
   if (target === said) return 1;
   if ((SOUND_ALIKE[target] || []).includes(said)) return 1;
   if (said === target + 's' || target === said + 's') return 0.95;
@@ -184,9 +259,9 @@ function wordSim(target, said) {
 }
 
 // Chấm một câu/ từ: trả về { score 0..1, words: [{ w, ok }] , heard }
-export function scoreSpeech(heardList, targetText) {
+export function scoreSpeech(heardList: string[], targetText: string): Score {
   const target = norm(targetText).split(' ').filter(Boolean);
-  let best = { score: 0, words: target.map((w) => ({ w, ok: false })), heard: heardList[0] || '' };
+  let best: Score = { score: 0, words: target.map((w) => ({ w, ok: false })), heard: heardList[0] || '' };
   for (const h of heardList) {
     const said = norm(h).split(' ').filter(Boolean);
     if (!said.length) continue;
@@ -205,4 +280,4 @@ export function scoreSpeech(heardList, targetText) {
 }
 
 // Ngưỡng đạt: từ đơn dễ hơn một chút
-export const passScore = (targetText) => (norm(targetText).includes(' ') ? 0.6 : 0.67);
+export const passScore = (targetText: string) => (norm(targetText).includes(' ') ? 0.6 : 0.67);

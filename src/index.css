@@ -1,0 +1,127 @@
+@import 'tailwindcss';
+
+/* Màu, font và hiệu ứng dùng chung (dùng như class Tailwind: bg-brand, animate-hop, ...) */
+@theme {
+  --font-sans: 'Baloo 2', system-ui, sans-serif;
+
+  --color-ink: #33264a;
+  --color-brand: #ff5d8f;
+  --color-brand-dark: #c93a68;
+  --color-heading: #e0457b;
+  --color-violet: #7b6cf6;
+  --color-violet-dark: #5546c9;
+  --color-sun: #ffd166;
+  --color-sun-dark: #d9a227;
+  --color-good: #4cd964;
+  --color-good-soft: #c9ffb8;
+  --color-bad: #e53935;
+  --color-bad-soft: #ffe1e1;
+
+  --animate-hop: hop 1.4s ease-in-out infinite;
+  --animate-wiggle: wiggle 1.6s ease-in-out infinite;
+  --animate-breathe: breathe 1.4s ease-in-out infinite;
+  --animate-pop: pop 0.4s both;
+  --animate-jump: jump 0.6s ease-in-out 2;
+  --animate-shake: shake 0.45s;
+  --animate-blink: blink 1s ease-in-out infinite;
+  --animate-fall: fall 2.2s ease-in forwards;
+
+  @keyframes hop {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-10px);
+    }
+  }
+  @keyframes wiggle {
+    0%,
+    100% {
+      transform: rotate(-8deg);
+    }
+    50% {
+      transform: rotate(8deg);
+    }
+  }
+  @keyframes breathe {
+    0%,
+    100% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.06);
+    }
+  }
+  @keyframes pop {
+    0% {
+      transform: scale(0.3);
+    }
+    70% {
+      transform: scale(1.2);
+    }
+    100% {
+      transform: scale(1);
+    }
+  }
+  @keyframes jump {
+    0%,
+    100% {
+      transform: translateY(0) scale(1);
+    }
+    40% {
+      transform: translateY(-20px) scale(1.1) rotate(-6deg);
+    }
+    70% {
+      transform: translateY(0) scale(0.95) rotate(4deg);
+    }
+  }
+  @keyframes shake {
+    0%,
+    100% {
+      transform: translateX(0);
+    }
+    20%,
+    60% {
+      transform: translateX(-10px);
+    }
+    40%,
+    80% {
+      transform: translateX(10px);
+    }
+  }
+  @keyframes blink {
+    50% {
+      border-color: var(--color-sun);
+    }
+  }
+  @keyframes fall {
+    to {
+      transform: translateY(110vh) rotate(540deg);
+    }
+  }
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    @apply font-sans text-ink overflow-hidden select-none;
+    background:
+      radial-gradient(circle at 20% 10%, #fff7c2 0, transparent 40%),
+      linear-gradient(160deg, #c3f0ff 0%, #e9e4ff 55%, #ffe3ef 100%);
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  button {
+    cursor: pointer;
+  }
+
+  button:disabled {
+    @apply opacity-35 cursor-default;
+  }
+}
