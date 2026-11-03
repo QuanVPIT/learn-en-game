@@ -24,7 +24,7 @@ Chơi online: https://quanvpit.github.io/learn-en-game/
 | 🗣️ Nói câu        | Nói        | Như trên nhưng nói cả câu                      |
 | 🏆 Thử thách      | Tổng hợp   | Trộn các kiểu câu hỏi                          |
 
-- **Giọng đọc AI** (Google Cloud Text-to-Speech) tạo sẵn thành file mp3; câu nào chưa có file thì dùng giọng của máy.
+- **Giọng đọc tạo sẵn** (giọng macOS Ava Premium + Linh Enhanced, hoặc Google Cloud TTS) thành file âm thanh; câu nào chưa có file thì dùng giọng của máy.
 - **Phần Nói**: nghe trực tiếp, chấm dễ tính cho trẻ; máy không nhận diện được thì thu âm cho bé nghe lại và bố mẹ chấm.
   Cần mở bằng Safari/Chrome (không mở trong Zalo/Facebook); iPhone/iPad cần bật _Đọc chính tả_.
 
@@ -37,7 +37,7 @@ React 18 · TypeScript · Vite · Tailwind CSS v4 · Vitest · ESLint + Prettier
 ```
 LearnENGame/
 ├── .github/workflows/deploy.yml  # Tự kiểm tra + deploy khi đẩy code lên main
-├── public/audio/                 # File giọng đọc mp3 + manifest.json (tạo bằng npm run audio)
+├── public/audio/                 # File giọng đọc + manifest.json (tạo bằng npm run audio:mac)
 ├── scripts/gen-audio.ts          # Script tạo giọng đọc AI
 ├── src/
 │   ├── main.tsx                  # Điểm khởi động
@@ -63,21 +63,26 @@ npm install
 npm run dev        # mở http://localhost:5173
 ```
 
-| Lệnh             | Việc làm                                 |
-| ---------------- | ---------------------------------------- |
-| `npm run build`  | Kiểm tra kiểu + build ra thư mục `dist/` |
-| `npm run test`   | Chạy kiểm thử                            |
-| `npm run lint`   | Kiểm tra lỗi code (ESLint)               |
-| `npm run format` | Định dạng code (Prettier)                |
-| `npm run check`  | Typecheck + lint + test                  |
-| `npm run audio`  | Tạo file giọng đọc AI cho các câu mới    |
+| Lệnh                | Việc làm                                   |
+| ------------------- | ------------------------------------------ |
+| `npm run build`     | Kiểm tra kiểu + build ra thư mục `dist/`   |
+| `npm run test`      | Chạy kiểm thử                              |
+| `npm run lint`      | Kiểm tra lỗi code (ESLint)                 |
+| `npm run format`    | Định dạng code (Prettier)                  |
+| `npm run check`     | Typecheck + lint + test                    |
+| `npm run audio:mac` | Tạo giọng đọc bằng giọng macOS cho câu mới |
+| `npm run audio`     | Tạo giọng đọc bằng Google Cloud TTS        |
 
-## Giọng đọc AI
+## Giọng đọc
 
-1. Tạo API key Google Cloud Text-to-Speech (bật _Cloud Text-to-Speech API_ trong Google Cloud Console).
-2. Copy `.env.example` thành `.env.local`, điền `GOOGLE_TTS_API_KEY=...` (file này không được đưa lên GitHub).
-3. Chạy `npm run audio`. Chỉ các câu mới được tạo; file của câu không còn dùng sẽ bị xoá.
-4. Đổi giọng: sửa `TTS_VOICE_EN` / `TTS_VOICE_VI` trong `.env.local`, xoá thư mục `public/audio/` rồi chạy lại.
+**Cách đang dùng – giọng macOS (miễn phí):**
+
+1. Tải giọng: System Settings → Accessibility → Read & Speak → System voice → Manage Voices
+   (hoặc VoiceOver Utility → Speech → Voice → Customize…): **Ava (Premium)** và **Linh (Enhanced)**.
+2. Trong `.env.local` (xem `.env.example`): `TTS_MAC_EN=Ava (Premium)` và `TTS_MAC_VI=com.apple.voice.enhanced.vi-VN.Linh`.
+3. Chạy `npm run audio:mac` (chỉ tạo câu mới) hoặc `npm run audio:mac -- --force` (tạo lại tất cả, khi đổi giọng).
+
+**Cách khác – Google Cloud TTS:** điền `GOOGLE_TTS_API_KEY` trong `.env.local` (cần tài khoản Google Cloud đã bật thanh toán), chạy `npm run audio`.
 
 ## Thêm / sửa bài học
 
@@ -86,7 +91,7 @@ Sửa file `src/data/gradeN.ts`. Mỗi chủ đề có:
 - `words`: `[tiếng Anh, nghĩa, hình (emoji / số / mã màu), cụm dùng trong câu?]`
 - `sentence(w)`: câu mẫu; `ask`: câu hỏi đi kèm (hoặc câu đáp nếu câu mẫu là câu hỏi).
 
-Sau khi sửa: `npm run check` (kiểm thử sẽ báo nếu thiếu hình, trùng hình, câu sai định dạng…), rồi `npm run audio` để tạo giọng cho câu mới.
+Sau khi sửa: `npm run check` (kiểm thử sẽ báo nếu thiếu hình, trùng hình, câu sai định dạng…), rồi `npm run audio:mac` để tạo giọng cho câu mới.
 
 ## Cập nhật bản online
 
