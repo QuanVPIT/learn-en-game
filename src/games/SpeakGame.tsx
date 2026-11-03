@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import { PROMPTS } from '../data/phrases';
 import { usePlayer } from '../app/player';
 import { sfx } from '../lib/sfx';
 import {
@@ -29,7 +28,14 @@ const NOTE = 'max-w-lg rounded-2xl bg-amber-100 px-3.5 py-2 text-center text-bas
 const HINT = 'max-w-md text-center text-lg font-bold';
 
 /** Nói từ / nói câu: máy nghe và chấm, hoặc thu âm cho bố mẹ chấm */
-export function SpeakGame({ topic, word, sentenceMode, onRight, onWrong }: GameProps & { sentenceMode?: boolean }) {
+export function SpeakGame({
+  topic,
+  word,
+  sentenceMode,
+  onAnswer,
+  onReady,
+  pauseTimer,
+}: GameProps & { sentenceMode?: boolean }) {
   const player = usePlayer();
   const target = sentenceMode ? topic.sentence(word) : word.en;
   const recognize = canRecognize() && !inAppBrowser();
@@ -38,20 +44,29 @@ export function SpeakGame({ topic, word, sentenceMode, onRight, onWrong }: GameP
   const [live, setLive] = useState('');
   const [result, setResult] = useState<Score | null>(null);
   const [error, setError] = useState('');
-  const [tries, setTries] = useState(0);
+  const [answered, setAnswered] = useState(false);
   const [myVoice, setMyVoice] = useState<string | null>(null);
   const session = useRef<ListenSession | Recording | null>(null);
   const alive = useAlive();
 
   const model = () => speak(target, 'en');
   useEffect(() => {
-    void model();
+    void model().then(onReady);
     return () => void session.current?.stop();
   }, []);
 
+  /** Chấm 1 lần duy nhất */
+  const answer = (ok: boolean) => {
+    if (answered) return;
+    setAnswered(true);
+    onAnswer(ok, null);
+  };
+
   // --- Máy tự nghe và chấm ---
   const startAuto = async () => {
+    if (answered) return;
     if (state === 'listening') return void session.current?.stop();
+    pauseTimer();
     setError('');
     setResult(null);
     setLive('');
@@ -74,17 +89,12 @@ export function SpeakGame({ topic, word, sentenceMode, onRight, onWrong }: GameP
     }
     const sc = scoreSpeech(r.heard, target);
     setResult(sc);
-    if (sc.score >= passScore(target)) {
-      onRight(null);
-    } else {
-      setTries((t) => t + 1);
-      onWrong(true);
-      void speak(sc.score >= 0.4 ? PROMPTS.almost(player) : PROMPTS.listenAgain(player), 'vi');
-    }
+    answer(sc.score >= passScore(target));
   };
 
   // --- Thu âm, bé nghe lại giọng mình, bố mẹ chấm ---
   const startRecord = async () => {
+    if (answered) return;
     if (state === 'recording') {
       const url = await (session.current as Recording).stop();
       if (!alive.current) return;
@@ -94,6 +104,7 @@ export function SpeakGame({ topic, word, sentenceMode, onRight, onWrong }: GameP
       return;
     }
     setError('');
+    pauseTimer();
     try {
       sfx.beep();
       const r = await startRecording();
@@ -185,20 +196,11 @@ export function SpeakGame({ topic, word, sentenceMode, onRight, onWrong }: GameP
               <Pill onClick={() => playUrl(myVoice)}>▶️ Nghe giọng {player.short}</Pill>
               <div className={HINT}>Bố mẹ nghe thử rồi chấm:</div>
               <div className="flex flex-wrap justify-center gap-3">
-                <BigButton small onClick={() => onRight(null)}>
-                  ✅ Nói đúng rồi
+                <BigButton small onClick={() => answer(true)}>
+                  ✅ Nói đúng
                 </BigButton>
-                <BigButton
-                  small
-                  alt
-                  onClick={() => {
-                    setMyVoice(null);
-                    setState('idle');
-                    onWrong(true);
-                    void model();
-                  }}
-                >
-                  🔁 Nói lại
+                <BigButton small alt onClick={() => answer(false)}>
+                  ❌ Chưa đúng
                 </BigButton>
               </div>
             </>
@@ -210,8 +212,11 @@ export function SpeakGame({ topic, word, sentenceMode, onRight, onWrong }: GameP
         <>
           <div className={HINT}>Bố mẹ nghe {player.short} nói theo mẫu rồi chấm nhé:</div>
           <div className="flex flex-wrap justify-center gap-3">
-            <BigButton small onClick={() => onRight(null)}>
-              ✅ Nói đúng rồi
+            <BigButton small onClick={() => answer(true)}>
+              ✅ Nói đúng
+            </BigButton>
+            <BigButton small alt onClick={() => answer(false)}>
+              ❌ Chưa đúng
             </BigButton>
             {(recognize || canRecord()) && (
               <Pill
@@ -228,12 +233,6 @@ export function SpeakGame({ topic, word, sentenceMode, onRight, onWrong }: GameP
       )}
 
       {error && <div className={NOTE}>⚠️ {error}</div>}
-      {mode === 'auto' && tries >= 2 && (
-        <div className="flex flex-wrap justify-center gap-3">
-          {canRecord() && <Pill onClick={() => setMode('record')}>🎙️ Thu âm, bố mẹ chấm</Pill>}
-          <Pill onClick={() => onRight(null)}>⏭ Qua câu khác</Pill>
-        </div>
-      )}
       {inAppBrowser() && (
         <div className={NOTE}>
           💡 Đang mở trong Zalo/Facebook nên máy không nghe được. Bấm ⋯ rồi chọn “Mở bằng trình duyệt” (Safari/Chrome)

@@ -1,13 +1,15 @@
 import type { Topic, Word } from '../data';
 
-/** Props chung cho mọi trò chơi một câu */
+/** Props chung cho mọi trò chơi một câu. Mỗi câu chỉ được trả lời 1 lần. */
 export interface GameProps {
   topic: Topic;
   word: Word;
-  /** Bé làm đúng. `say` = câu đọc lại trước lời khen (nếu có) */
-  onRight: (say?: string | null) => void;
-  /** Bé làm sai. `quiet` = chỉ kêu "bụp", không đọc lời động viên */
-  onWrong: (quiet?: boolean) => void;
+  /** Bé trả lời xong. `say` = câu đọc lại trước lời khen (khi đúng) */
+  onAnswer: (correct: boolean, say?: string | null) => void;
+  /** Đã đọc xong câu hỏi: bắt đầu tính giờ */
+  onReady: () => void;
+  /** Tạm dừng đồng hồ (vd. bé đang nói vào micro) */
+  pauseTimer: () => void;
 }
 
 export type QuestionType =

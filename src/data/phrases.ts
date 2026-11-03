@@ -2,6 +2,7 @@
 import { TOPICS } from './index';
 import { PLAYERS } from './players';
 import { dialog } from './lessons';
+import { BADGES } from './badges';
 import type { Lang, Player } from './types';
 
 /** {n} = tên đầy đủ, {s} = tên ngắn */
@@ -51,17 +52,31 @@ export const PRAISES_EN = [
   'Nice work, {s}!',
 ];
 
-export const OOPS_COMMON = [
-  'Úi, trượt mất rồi! {n} thử lại nha!',
-  'Gần đúng rồi! {n} cố lên chút nữa!',
-  'Hì hì, chưa đúng. {n} nhìn kỹ lại nha!',
-  'Oops! Không sao, {n} làm lại phát nữa nào!',
+/** Chê ngộ nghĩnh khi chọn sai */
+export const TEASE_COMMON = [
+  'Ối dồi ôi! {n} chọn trật lất rồi!',
+  'Sai be bét rồi {n} ơi! Hì hì!',
+  'Ui da, câu này mà {n} cũng trượt à? Lêu lêu!',
+  'Ôi không! Con mèo nhà bên còn chọn đúng hơn {n} đấy!',
+  'Trật rồi nha {n}! Lần sau mở to mắt ra nhé!',
+  'Ối giời, {n} đi rửa mặt cho tỉnh rồi làm tiếp nào!',
+  'Sai mất rồi! {n} lơ mơ như chú gà buổi sáng!',
 ];
 
-export const OOPS_OWN: Record<string, string[]> = {
-  nic: ['Ối, gió lùa qua răng sún nên nghe nhầm hả? Nic Sún Răng thử lại nào!'],
-  ny: ['Ối, chắc tại trời tối quá nên Ny Đen Đen nhìn nhầm hả? Thử lại nào!'],
+export const TEASE_OWN: Record<string, string[]> = {
+  nic: [
+    'Ối, câu trả lời bay qua chỗ răng sún mất rồi! Nic Sún Răng sai rồi!',
+    'Răng sún nên Nic Sún Răng cắn nhầm đáp án rồi kìa!',
+  ],
+  ny: ['Đen thôi đỏ quên đi! Ny Đen Đen sai rồi, hì hì!', 'Ny Đen Đen ơi, tắt đèn hay sao mà chọn nhầm thế!'],
 };
+
+/** Chê khi hết giờ */
+export const TIMEOUT_TEASE = [
+  'Hết giờ! {n} ngủ gật hả?',
+  'Tích tắc tích tắc! {n} chậm như rùa bò rồi!',
+  'Ối, đồng hồ chạy mất rồi! {n} nhanh tay lên nào!',
+];
 
 export const DONE: Record<1 | 2 | 3, string[]> = {
   3: ['Ba ngôi sao! {n} là vua tiếng Anh luôn!', 'Tuyệt cú mèo! Ba sao luôn! {n} giỏi nhất quả đất!'],
@@ -80,8 +95,9 @@ export const PROMPTS = {
   hello: (p: Player) => `Xin chào ${p.name}!`,
   helloEn: (p: Player) => `Hello ${p.short}! Let's learn English!`,
   chooseTopic: (p: Player) => `${p.name} muốn học chủ đề nào?`,
-  almost: (p: Player) => `Gần đúng rồi! ${p.name} nói lại nha!`,
-  listenAgain: (p: Player) => `${p.name} nghe mẫu rồi nói lại nha!`,
+  review: (p: Player) => `${p.name} ôn lại những câu hay sai nào!`,
+  retry: (p: Player) => `${p.name} làm lại những câu sai nào!`,
+  badge: (p: Player, name: string) => `Chúc mừng ${p.name}! Huy hiệu mới: ${name}!`,
 };
 
 /** Toàn bộ câu cần giọng đọc (để tạo file mp3) */
@@ -94,11 +110,16 @@ export function allPhrases(): { lang: Lang; text: string }[] {
     add('vi', PROMPTS.hello(p));
     add('en', PROMPTS.helloEn(p));
     add('vi', PROMPTS.chooseTopic(p));
-    add('vi', PROMPTS.almost(p));
-    add('vi', PROMPTS.listenAgain(p));
-    [...PRAISES_COMMON, ...(PRAISES_OWN[p.id] ?? []), ...OOPS_COMMON, ...(OOPS_OWN[p.id] ?? [])].forEach((t) =>
-      add('vi', fillName(t, p)),
-    );
+    add('vi', PROMPTS.review(p));
+    add('vi', PROMPTS.retry(p));
+    BADGES.forEach((b) => add('vi', PROMPTS.badge(p, b.name)));
+    [
+      ...PRAISES_COMMON,
+      ...(PRAISES_OWN[p.id] ?? []),
+      ...TEASE_COMMON,
+      ...(TEASE_OWN[p.id] ?? []),
+      ...TIMEOUT_TEASE,
+    ].forEach((t) => add('vi', fillName(t, p)));
     PRAISES_EN.forEach((t) => add('en', fillName(t, p)));
     Object.values(DONE)
       .flat()

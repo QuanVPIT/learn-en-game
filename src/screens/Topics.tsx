@@ -3,37 +3,67 @@ import { GRADES, TOPICS, type Grade, type Topic } from '../data';
 import { activitiesFor } from '../data/lessons';
 import { sfx } from '../lib/sfx';
 import { storage } from '../lib/storage';
-import { usePlayer } from '../app/player';
-import { sumStars, type PlayerStars } from '../app/progress';
-import { Screen, Title, TopBar } from '../components/ui';
 import { cx } from '../lib/cx';
+import { usePlayer } from '../app/player';
+import { sumStars, totalStars, type PlayerProgress } from '../app/progress';
+import { Screen, Title, TopBar } from '../components/ui';
 
-/** Chọn lớp và chủ đề */
+const CHIP = 'rounded-full bg-white px-3.5 py-1 text-base font-extrabold shadow-[0_3px_0_#0002] active:translate-y-0.5';
+
+/** Chọn lớp và chủ đề; lối vào Sổ ôn tập, Huy hiệu, Báo cáo bố mẹ */
 export function Topics({
-  stars,
+  progress,
   onPick,
   onBack,
+  onReview,
+  onBadges,
+  onReport,
 }: {
-  stars: PlayerStars;
+  progress: PlayerProgress;
   onPick: (t: Topic) => void;
   onBack: () => void;
+  onReview: () => void;
+  onBadges: () => void;
+  onReport: () => void;
 }) {
   const player = usePlayer();
   const [grade, setGrade] = useState<Grade>(() => storage.get('grade', 2));
   useEffect(() => storage.set('grade', grade), [grade]);
-  const total = Object.values(stars).reduce((n, t) => n + sumStars(t), 0);
+  const reviewCount = Object.keys(progress.review).length;
 
   return (
     <Screen scroll>
       <TopBar onBack={onBack}>
         <Title>Chọn chủ đề nào {player.short}! 📚</Title>
       </TopBar>
-      <button onClick={onBack} className="rounded-full bg-white px-4 py-1 text-[17px] font-bold shadow-[0_3px_0_#0002]">
-        {player.face} {player.name} · <u>đổi bé</u>
-      </button>
-      <div className="rounded-full bg-white px-4 text-xl font-extrabold">🌟 Tổng: {total} sao</div>
 
-      <div className="flex max-w-full gap-1.5 overflow-x-auto rounded-full bg-white/50 p-1.5">
+      <div className="flex flex-wrap justify-center gap-2">
+        <button onClick={onBack} className={CHIP}>
+          {player.face} {player.name} · <u>đổi bé</u>
+        </button>
+        <span className={CHIP}>🌟 {totalStars(progress)} sao</span>
+        <span className={CHIP}>🔥 {progress.streak.count} ngày</span>
+      </div>
+
+      <div className="flex flex-wrap justify-center gap-2">
+        <button
+          onClick={onReview}
+          disabled={!reviewCount}
+          className={cx(CHIP, reviewCount ? 'bg-amber-200' : '')}
+          title="Ôn lại những câu hay sai"
+        >
+          📒 Sổ ôn tập{reviewCount ? ` (${reviewCount})` : ''}
+        </button>
+        <button onClick={onBadges} className={CHIP}>
+          🏅 Huy hiệu ({progress.badges.length})
+        </button>
+        <button onClick={onReport} className={CHIP}>
+          📊 Bố mẹ
+        </button>
+      </div>
+
+      {/* Thanh chọn lớp: 5 nút chia đều, luôn hiện đủ */}
+      <div className="grid w-full max-w-xl grid-cols-5 gap-1 rounded-3xl bg-white/60 p-1">
         {GRADES.map((g) => (
           <button
             key={g.id}
@@ -42,12 +72,12 @@ export function Topics({
               setGrade(g.id);
             }}
             className={cx(
-              'flex flex-none flex-col items-center rounded-full px-4 py-1 text-lg leading-tight font-extrabold',
-              grade === g.id && 'bg-brand text-white shadow-[0_4px_0_var(--color-brand-dark)]',
+              'flex min-w-0 flex-col items-center rounded-2xl px-1 py-1.5 leading-tight font-extrabold',
+              grade === g.id ? 'bg-brand text-white shadow-[0_4px_0_var(--color-brand-dark)]' : 'active:bg-white',
             )}
           >
-            {g.label}
-            <small className="text-[11px] font-semibold opacity-75">{g.note}</small>
+            <span className="text-[clamp(15px,4vw,20px)] whitespace-nowrap">{g.label}</span>
+            <small className="hidden text-[11px] font-semibold opacity-75 sm:block">{g.note}</small>
           </button>
         ))}
       </div>
@@ -64,7 +94,7 @@ export function Topics({
             <span className="text-center text-[17px] leading-tight font-extrabold">{t.title}</span>
             <span className="text-sm opacity-75">{t.vi}</span>
             <span className="text-sm font-bold">
-              ⭐ {sumStars(stars[t.id])}/{(activitiesFor(t).length - 1) * 3}
+              ⭐ {sumStars(progress.stars[t.id])}/{(activitiesFor(t).length - 1) * 3}
             </span>
           </button>
         ))}

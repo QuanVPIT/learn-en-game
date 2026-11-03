@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import { pictureOptions } from '../data/lessons';
 import { speak } from '../lib/voice';
 import { Pic } from '../components/Pic';
 import { ChoiceCard } from './ChoiceCard';
 import { choiceState } from './choiceState';
+import { useOnce } from './useOnce';
 import type { GameProps } from './types';
 
 const BOX =
@@ -15,29 +16,26 @@ export function ChooseGame({
   topic,
   word,
   mode,
-  onRight,
-  onWrong,
+  onAnswer,
+  onReady,
 }: GameProps & { mode: 'listen' | 'read' | 'readSentence' }) {
   const opts = useMemo(() => pictureOptions(topic, word, 4), [word]);
-  const [wrong, setWrong] = useState<string[]>([]);
-  const [done, setDone] = useState(false);
+  const [picked, choose] = useOnce<string>();
   const sentence = topic.sentence(word);
+  const correct = picked === word.en;
   const hear = () => speak(mode === 'listen' ? word.en : sentence, 'en');
 
   useEffect(() => {
-    if (mode === 'listen') void hear();
+    if (mode === 'listen') void hear().then(onReady);
+    else onReady();
   }, []);
 
-  const tap = (en: string) => {
-    if (done || wrong.includes(en)) return;
-    if (en === word.en) {
-      setDone(true);
-      onRight(mode === 'listen' ? null : mode === 'read' ? word.en : sentence);
-    } else {
-      setWrong([...wrong, en]);
-      onWrong();
-    }
-  };
+  const tap = (en: string) =>
+    choose(en, () =>
+      en === word.en
+        ? onAnswer(true, mode === 'listen' ? null : mode === 'read' ? word.en : sentence)
+        : onAnswer(false),
+    );
 
   return (
     <>
@@ -62,14 +60,11 @@ export function ChooseGame({
         </div>
       )}
       <div className="grid w-full flex-1 grid-cols-2 content-center gap-3 sm:grid-cols-4">
-        {opts.map((w) => {
-          const state = choiceState(w.en, word.en, wrong, done);
-          return (
-            <ChoiceCard key={w.en} state={state} onClick={() => tap(w.en)} label={state !== 'idle' ? w.en : undefined}>
-              <Pic pic={w.pic} />
-            </ChoiceCard>
-          );
-        })}
+        {opts.map((w) => (
+          <ChoiceCard key={w.en} state={choiceState(w.en, picked, correct)} onClick={() => tap(w.en)}>
+            <Pic pic={w.pic} />
+          </ChoiceCard>
+        ))}
       </div>
     </>
   );

@@ -2,11 +2,12 @@
 import {
   DONE,
   DONE_OWN,
-  OOPS_COMMON,
-  OOPS_OWN,
   PRAISES_COMMON,
   PRAISES_EN,
   PRAISES_OWN,
+  TEASE_COMMON,
+  TEASE_OWN,
+  TIMEOUT_TEASE,
   fillName,
 } from '../data/phrases';
 import type { Lang, Player } from '../data/types';
@@ -21,15 +22,21 @@ export function cheer(p: Player): { text: string; lang: Lang } {
   return { text: fillName(pick(r < 0.65 && own.length ? own : PRAISES_COMMON), p), lang: 'vi' };
 }
 
-export function oops(p: Player): string {
-  sfx.oops();
-  return fillName(pick([...OOPS_COMMON, ...(OOPS_OWN[p.id] ?? [])]), p);
+/** Chê ngộ nghĩnh khi sai (kèm tiếng "oa oa oa") hoặc hết giờ */
+export function tease(p: Player, timeout = false): string {
+  if (timeout) {
+    sfx.timeout();
+    return fillName(pick(TIMEOUT_TEASE), p);
+  }
+  sfx.wrong();
+  const own = TEASE_OWN[p.id] ?? [];
+  return fillName(pick(Math.random() < 0.35 && own.length ? own : TEASE_COMMON), p);
 }
 
 /** Lời khen cuối lượt (có thể 2 câu) */
-export function finishLines(p: Player, stars: 1 | 2 | 3): string[] {
+export function finishLines(p: Player, stars: 0 | 1 | 2 | 3): string[] {
   sfx.finish();
-  const lines = [fillName(pick(DONE[stars]), p)];
+  const lines = [fillName(pick(DONE[Math.max(1, stars) as 1 | 2 | 3]), p)];
   if (stars === 3 && DONE_OWN[p.id]) lines.push(DONE_OWN[p.id]);
   return lines;
 }

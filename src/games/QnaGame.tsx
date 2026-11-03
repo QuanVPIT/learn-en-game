@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import type { Topic } from '../data';
 import { answerOptions, dialog } from '../data/lessons';
 import { speak } from '../lib/voice';
@@ -6,31 +6,20 @@ import { Pic } from '../components/Pic';
 import { Pill } from '../components/ui';
 import { ChoiceCard } from './ChoiceCard';
 import { choiceState } from './choiceState';
+import { useOnce } from './useOnce';
 import type { GameProps } from './types';
 
 /** Hỏi – Đáp: nghe câu hỏi, chọn câu trả lời đúng */
-export function QnaGame({ topic, word, topics, onRight, onWrong }: GameProps & { topics: Topic[] }) {
+export function QnaGame({ topic, word, topics, onAnswer, onReady }: GameProps & { topics: Topic[] }) {
   const d = dialog(topic, word);
   const question = d.q ?? d.a;
   const opts = useMemo(() => answerOptions(topics, topic, word, 3), [word]);
-  const [wrong, setWrong] = useState<string[]>([]);
-  const [done, setDone] = useState(false);
+  const [picked, choose] = useOnce<string>();
   const hear = () => speak(question, 'en');
 
   useEffect(() => {
-    void hear();
+    void hear().then(onReady);
   }, []);
-
-  const tap = (o: string) => {
-    if (done || wrong.includes(o)) return;
-    if (o === d.a) {
-      setDone(true);
-      onRight(d.a);
-    } else {
-      setWrong([...wrong, o]);
-      onWrong();
-    }
-  };
 
   return (
     <>
@@ -48,7 +37,12 @@ export function QnaGame({ topic, word, topics, onRight, onWrong }: GameProps & {
       <p className="m-0 font-bold opacity-75">Chọn câu trả lời đúng:</p>
       <div className="grid w-full max-w-3xl flex-1 grid-cols-1 content-center gap-3">
         {opts.map((o) => (
-          <ChoiceCard key={o} text state={choiceState(o, d.a, wrong, done)} onClick={() => tap(o)}>
+          <ChoiceCard
+            key={o}
+            text
+            state={choiceState(o, picked, picked === d.a)}
+            onClick={() => choose(o, () => (o === d.a ? onAnswer(true, d.a) : onAnswer(false)))}
+          >
             ↪️ {o}
           </ChoiceCard>
         ))}

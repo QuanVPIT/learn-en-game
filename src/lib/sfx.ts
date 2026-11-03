@@ -85,7 +85,15 @@ const FUN_SOUNDS = [
 
 export const sfx = {
   fun: () => pick(FUN_SOUNDS)(),
-  oops: () => tone(300, 0, 0.18, { type: 'triangle', to: 160, vol: 0.2 }),
+  // Kèn "oa oa oaaa" khi sai
+  wrong: () => {
+    [392, 370, 349].forEach((f, i) => tone(f, i * 0.28, 0.26, { type: 'sawtooth', vol: 0.09 }));
+    tone(330, 0.84, 0.7, { type: 'sawtooth', to: 300, vol: 0.09 });
+  },
+  // Chuông báo hết giờ
+  timeout: () => [0, 0.15, 0.3].forEach((s) => tone(1200, s, 0.1, { type: 'square', vol: 0.1 })),
+  // Tích tắc những giây cuối
+  tick: () => tone(1500, 0, 0.04, { type: 'square', vol: 0.06 }),
   buzz: () => tone(200, 0, 0.12, { type: 'square', vol: 0.08 }),
   pop: () => tone(600, 0, 0.1, { to: 1200, vol: 0.2 }),
   beep: () => tone(880, 0, 0.12, { vol: 0.2 }),

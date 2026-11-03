@@ -7,13 +7,11 @@ export function ChoiceCard({
   state,
   onClick,
   children,
-  label,
   text,
 }: {
   state: ChoiceState;
   onClick: () => void;
   children: ReactNode;
-  label?: string;
   /** Ô chữ (câu trả lời) thay vì ô hình */
   text?: boolean;
 }) {
@@ -31,7 +29,6 @@ export function ChoiceCard({
       )}
     >
       {children}
-      {label && <span className="absolute bottom-1.5 text-[clamp(14px,3.5vw,20px)] font-extrabold">{label}</span>}
     </button>
   );
 }

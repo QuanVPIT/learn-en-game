@@ -1,5 +1,5 @@
 export type ChoiceState = 'idle' | 'right' | 'wrong' | 'faded';
 
-/** Trạng thái một ô lựa chọn */
-export const choiceState = (id: string, answer: string, wrong: string[], done: boolean): ChoiceState =>
-  done ? (id === answer ? 'right' : 'faded') : wrong.includes(id) ? 'wrong' : 'idle';
+/** Trạng thái một ô sau khi bé chọn: chỉ tô ô bé chọn (không lộ đáp án đúng nếu bé sai) */
+export const choiceState = (id: string, picked: string | null, correct: boolean): ChoiceState =>
+  picked == null ? 'idle' : id === picked ? (correct ? 'right' : 'wrong') : 'faded';
